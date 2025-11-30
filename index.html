@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>1IM Community Vote System</title>
+    
+    <link rel="icon" href="/1im-commu-vote/icon.ico" type="image/x-icon">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- แก้ไข URL Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- แก้ไข URL FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --primary-hover: #3a56d4;
+            --secondary-color: #f72585;
+            --bg-color: #f8f9fa;
+            --text-color: #2b2d42;
+            --card-bg: #ffffff;
+            --shadow: 0 10px 30px rgba(0,0,0,0.08);
+            --shadow-hover: 0 15px 35px rgba(0,0,0,0.15);
+        }
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            text-align: center;
+            padding: 40px 20px;
+            margin: 0;
+            line-height: 1.6;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body.modal-open { overflow: hidden; } /* แก้ไข . modal-open */
+
+        .user-bar {
+            display: flex; justify-content: flex-end; align-items: center;
+            margin-bottom: 10px; padding: 0 10px; position: absolute; top: 20px; right: 20px; z-index: 100;
+        }
+        @media (max-width: 600px) { .user-bar { position: static; justify-content: center; margin-bottom: 20px; } }
+
+        .user-info {
+            display: flex; align-items: center; gap: 10px; background: #fff;
+            padding: 5px 15px 5px 5px; border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee;
+        }
+        .user-avatar { width: 35px; height: 35px; border-radius: 50%; } /* แก้ไข . user-avatar */
+        .user-name { font-weight: 500; color: #333; font-size: 0.9em; } /* แก้ไข . user-name */
+        
+        .login-btn {
+            background: #5865F2; color: white; text-decoration: none; padding: 8px 16px;
+            border-radius: 50px; font-weight: 500; font-size: 0.9em; display: inline-flex;
+            align-items: center; gap: 8px; transition: all 0.2s;
+            box-shadow: 0 4px 10px rgba(88, 101, 242, 0.3);
+        }
+        .login-btn:hover { background: #4752c4; transform: translateY(-2px); }
+
+        .error-banner {
+            background: #ffebee; border-left: 4px solid #f44336; color: #c62828;
+            padding: 12px 16px; border-radius: 4px; margin: 15px auto; display: none;
+            max-width: 600px;
+        }
+
+        .success-toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4caf50;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            z-index: 10000;
+            font-weight: 500;
+            animation: slideUpToast 0.3s ease;
+        }
+        @keyframes slideUpToast { from { transform: translateX(-50%) translateY(20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
+
+        h1 { color: var(--primary-color); font-weight: 600; font-size: 2.5em; margin-bottom: 10px; margin-top: 30px; text-transform: uppercase; }
+        #timer { font-size: 1.2em; color: #555; background: #fff; display: inline-block; padding: 10px 25px; border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 40px; font-weight: 500; border: 1px solid #eee; transition: color 0.3s; }
+        #timer i { margin-right: 8px; color: var(--secondary-color); }
+
+        .gallery {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 30px; max-width: 1280px; margin: 0 auto; min-height: 300px;
+        }
+        .card {
+            background: var(--card-bg); border-radius: 20px; overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative; box-shadow: var(--shadow);
+            display: flex; flex-direction: column; border: 1px solid #f0f0f0;
+            opacity: 0; animation: fadeIn 0.5s ease forwards;
+        }
+        @keyframes fadeIn { to { opacity: 1; } }
+        .card.winner-1 { border: 3px solid #FFD700; transform: scale(1.05); z-index: 10; box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); } /* แก้ไข . winner-1 */
+        .card.winner-2 { border: 3px solid #C0C0C0; }
+        .card.winner-3 { border: 3px solid #CD7F32; }
+        .card:hover { transform: translateY(-10px); box-shadow: var(--shadow-hover); }
+        .card img { width: 100%; height: 260px; object-fit: cover; cursor: pointer; transition: transform 0.5s ease; }
+        .card:hover img { transform: scale(1.05); }
+        
+        .info { padding: 20px; background: #fff; display: flex; flex-direction: column; gap: 10px; }
+        .author { font-weight: 500; color: #333; font-size: 1.2em; }
+        
+        .vote-btn {
+            background: linear-gradient(135deg, var(--primary-color), #304ffe); color: white;
+            border: none; padding: 12px; border-radius: 12px; cursor: pointer; width: 100%;
+            font-size: 1em; font-family: 'Kanit'; font-weight: 500; transition: all 0.3s;
+            box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3);
+        }
+        .vote-btn:hover { transform: translateY(-2px); }
+        .vote-btn:disabled { background: #e0e0e0; cursor: not-allowed; color: #999; box-shadow: none; transform: none; background-image: none; }
+        
+        .vote-btn.waiting { 
+            background: #ffc107 !important; 
+            color: #444 !important; 
+            cursor: not-allowed; 
+            opacity: 1 !important;
+        } /* แก้ไข . waiting */
+
+        .votes-count, .rank-badge { position: absolute; z-index: 2; background: white; border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; }
+        .votes-count { top: 15px; right: 15px; border-radius: 30px; padding: 6px 14px; color: var(--primary-color); font-weight: bold; }
+        .rank-badge { top: 10px; left: 10px; width: 45px; height: 45px; font-size: 1.4em; }
+        .rank-badge.gold { color: #FFD700; border: 2px solid #FFD700; } /* แก้ไข . rank-badge */
+        .rank-badge.silver { color: #C0C0C0; border: 2px solid #C0C0C0; }
+        .rank-badge.bronze { color: #CD7F32; border: 2px solid #CD7F32; }
+
+        .modal { 
+            display: none; position: fixed; z-index: 999; left: 0; top: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(8px);
+        }
+        
+        .modal-container {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100%; width: 100%; position: relative;
+        }
+
+        .image-wrapper {
+            position: relative; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+
+        .modal-content { 
+            max-width: 95%; max-height: 95%; 
+            border-radius: 4px; box-shadow: 0 0 50px rgba(0,0,0,0.5); 
+            transition: transform 0.1s ease-out; cursor: grab; user-select: none;
+        }
+        .modal-content:active { cursor: grabbing; }
+
+        .image-tools {
+            position: absolute; right: 100px; top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 15px; 
+            background: rgba(255, 255, 255, 0.1); padding: 15px 10px;
+            border-radius: 50px; z-index: 1010; backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .tool-btn {
+            color: white; font-size: 1.2em; cursor: pointer; transition: 0.2s;
+            background: none; border: none; width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center; border-radius: 50%;
+        } /* แก้ไข 1. 2em และ . tool-btn */
+        .tool-btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.1); }
+
+        .bottom-bar {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            display: flex; align-items: center; gap: 20px;
+            background: white; padding: 10px 25px; border-radius: 50px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 1005;
+            min-width: 300px; justify-content: space-between;
+            animation: slideUp 0.3s ease;
+        }
+        .bottom-info h3 { margin: 0; font-size: 1.1em; color: #333; display: flex; align-items: center; gap: 8px; } /* แก้ไข . bottom-info */
+        
+        .comment-toggle-btn {
+            background: #f0f2f5; color: #555; border: none; width: 40px; height: 40px;
+            border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            font-size: 1.1em; transition: 0.2s; position: relative;
+        }
+        .comment-toggle-btn:hover { background: #e4e6eb; color: var(--primary-color); }
+        .badge {
+            position: absolute; top: -5px; right: -5px; background: var(--secondary-color); color: white;
+            font-size: 0.7em; width: 18px; height: 18px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; border: 2px solid white;
+        }
+
+        @media (max-width: 768px) {
+            .image-tools {
+                right: auto; top: auto; bottom: 110px; 
+                left: 50%; transform: translateX(-50%);
+                flex-direction: row; padding: 8px 16px; border-radius: 30px;
+                background: rgba(0,0,0,0.6);
+                gap: 20px; 
+            }
+            .bottom-bar { bottom: 20px; width: 90%; box-sizing: border-box; }
+            .prev, .next { z-index: 1020; background: rgba(0,0,0,0.4); } /* แก้ไข . prev, . next */
+        }
+
+        .comment-sheet {
+            position: fixed; left: 0; bottom: -100%; width: 100%; height: 60vh;
+            background: white; border-radius: 20px 20px 0 0;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.3); z-index: 2000;
+            transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; flex-direction: column;
+        }
+        .comment-sheet.active { bottom: 0; }
+        
+        .sheet-header { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .sheet-body { flex-grow: 1; overflow-y: auto; padding: 20px; background: #f9f9f9; }
+        .sheet-footer { padding: 15px 20px; border-top: 1px solid #eee; background: white; }
+        
+        .comment-item { display: flex; gap: 12px; margin-bottom: 15px; }
+        .comment-avatar { width: 35px; height: 35px; border-radius: 50%; }
+        .comment-bubble { background: white; padding: 10px 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); flex-grow: 1; text-align: left; }
+        .comment-user { font-weight: 600; font-size: 0.9em; color: #333; margin-bottom: 2px; }
+        .comment-text { font-size: 0.95em; color: #555; word-break: break-word; }
+        .comment-time { font-size: 0.75em; color: #aaa; margin-top: 4px; text-align: right; }
+
+        .comment-form { display: flex; gap: 10px; }
+        .comment-input { flex-grow: 1; padding: 10px 15px; border: 1px solid #ddd; border-radius: 25px; outline: none; font-size: 16px; }
+        .send-btn { background: var(--primary-color); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .send-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .prev, .next {
+            cursor: pointer; position: absolute; top: 50%; width: auto; padding: 16px;
+            margin-top: -50px; color: white; font-weight: bold; font-size: 40px;
+            transition: 0.3s; border-radius: 50%; background: rgba(255, 255, 255, 0.1);
+            user-select: none; z-index: 1002; text-decoration: none;
+        }
+        .prev { left: 20px; } .next { right: 20px; }
+        .prev:hover, .next:hover { background-color: rgba(255, 255, 255, 0.3); } /* แก้ไข . prev:hover */
+        .close { position: absolute; top: 20px; right: 30px; color: #fff; font-size: 40px; font-weight: bold; cursor: pointer; z-index: 1020; } /* แก้ไข . close */
+
+        .privacy-box { background: white; width: 90%; max-width: 600px; margin: 10vh auto; padding: 40px; border-radius: 20px; text-align: left; position: relative; animation: zoomIn 0.3s ease; }
+        .info-toggle { position: fixed; bottom: 30px; right: 30px; width: 50px; height: 50px; background: #2b2d42; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 900; transition: 0.3s; }
+        .privacy-box .close-btn-inner { background: var(--primary-color); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; float: right; margin-top: 10px; } /* แก้ไข . close-btn-inner */
+        .contact-link { color: var(--secondary-color); font-weight: bold; text-decoration: none; }
+        .contact-link:hover { text-decoration: underline; }
+        
+        @keyframes slideUp { from {transform:translate(-50%, 20px); opacity:0} to {transform:translate(-50%, 0); opacity:1} }
+        @keyframes zoomIn { from {transform:scale(0.8); opacity:0} to {transform:scale(1); opacity:1} }
+
+        .loading-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; }
+        .spinner { width: 50px; height: 50px; border: 5px solid #e1e4e8; border-top: 5px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        .loading-text { font-size: 1.2em; color: #888; font-weight: 300; } /* แก้ไข . loading-text */
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="user-bar" id="userBar"></div>
+    <div class="error-banner" id="errorBanner"></div>
+
+    <h1><i class="fa-solid fa-square-poll-vertical"></i> 1IM Community Vote System</h1>
+    <div id="timer"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลด...</div>
+
+    <div class="gallery" id="gallery">
+        <div class="loading-container"><div class="spinner"></div><div class="loading-text">กำลังเชื่อมต่อ...</div></div>
+    </div>
+
+    <div id="modal" class="modal">
+        <span class="close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></span>
+        <a class="prev" onclick="changeImage(-1)">&#10094;</a>
+        <a class="next" onclick="changeImage(1)">&#10095;</a>
+
+        <div class="modal-container">
+            <div class="image-wrapper" id="imgWrapper">
+                <img class="modal-content" id="img01">
+            </div>
+
+            <div class="image-tools">
+                <button class="tool-btn" onclick="zoomImage(0.2)" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button> <!-- แก้ไข 0. 2 -->
+                <button class="tool-btn" onclick="zoomImage(-0.2)" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                <button class="tool-btn" onclick="resetZoom()" title="Reset"><i class="fa-solid fa-compress"></i></button>
+                <button class="tool-btn" onclick="toggleFullScreen()" title="Full Screen"><i class="fa-solid fa-expand"></i></button>
+            </div>
+            
+            <div class="bottom-bar">
+                <div class="bottom-info">
+                    <h3 id="modal-author"><i class="fa-solid fa-user-pen"></i> <span>Author</span></h3>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <button class="comment-toggle-btn" onclick="toggleCommentSheet()">
+                        <i class="fa-regular fa-comments"></i>
+                        <span class="badge" id="comment-count-badge">0</span>
+                    </button>
+                    <button id="modal-vote-btn" class="vote-btn" style="width: 140px; padding: 10px;">โหวต</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="comment-sheet" id="commentSheet">
+        <div class="sheet-header">
+            <h3><i class="fa-regular fa-comments"></i> ความคิดเห็น</h3>
+            <span style="cursor:pointer; font-size:1.2em;" onclick="toggleCommentSheet()"><i class="fa-solid fa-xmark"></i></span>
+        </div>
+        <div class="sheet-body">
+            <div id="comments-list"></div>
+        </div>
+        <div class="sheet-footer">
+            <div id="comment-input-area" class="comment-form" style="display: none;">
+                <input type="text" class="comment-input" id="comment-input" placeholder="แสดงความคิดเห็น..." maxlength="200">
+                <button class="send-btn" id="send-comment-btn" onclick="sendComment()"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+            <div id="login-warning" style="display:none; color:red; font-size:0.9em; text-align:center; padding:10px;">
+                <i class="fa-brands fa-discord"></i> กรุณา Login เพื่อแสดงความคิดเห็น
+            </div>
+        </div>
+    </div>
+
+    <div class="info-toggle" onclick="openPrivacyModal()">
+        <i class="fa-solid fa-info"></i>
+    </div>
+
+    <div id="privacyModal" class="modal">
+        <div class="privacy-box">
+            <h2><i class="fa-solid fa-shield-halved"></i> ข้อกำหนดและเงื่อนไข</h2>
+
+            <h3><i class="fa-brands fa-discord" style="color:#5865F2;"></i> การเข้าสู่ระบบด้วย Discord</h3>
+            <p>
+                ระบบการเข้าสู่ระบบด้วย Discord มีวัตถุประสงค์เพื่อ <strong>"การยืนยันตัวตนเท่านั้น"</strong> เพื่อป้องกันการโหวตซ้ำและสแปม 
+                กระบวนการ Login ทั้งหมดเกิดขึ้นบนเว็บไซต์ของ Discord โดยตรง ทางเราเพียงแค่รับข้อมูล User ID 
+                เพื่อยืนยันสิทธิ์ในการโหวต ไม่มีการเก็บรหัสผ่านหรือเข้าถึงข้อมูลส่วนตัวเชิงลึกอื่น ๆ ของท่าน
+            </p>
+
+            <h3><i class="fa-solid fa-copyright" style="color:#ffae00;"></i> ลิขสิทธิ์ผลงาน</h3>
+            <p>
+                ภาพผลงานที่ปรากฏบนเว็บไซต์นี้ เป็นลิขสิทธิ์ของทางเว็บไซต์และศิลปินเจ้าของผลงานโดยถูกต้อง 
+                ห้ามมิให้ผู้ใดทำการคัดลอก ดัดแปลง หรือนำไปใช้แอบอ้างโดยไม่ได้รับอนุญาต 
+                ทางเราและศิลปินขอสงวนสิทธิ์ในผลงานของตนเอง
+            </p>
+
+            <h3><i class="fa-solid fa-bug" style="color:#f72585;"></i> แจ้งปัญหาการใช้งาน</h3>
+            <p>
+                หากพบปัญหาในการใช้งานเว็บไซต์ หรือพบเห็นความผิดปกติ สามารถติดต่อผู้ดูแลระบบได้ที่ zc.  <br>
+                <a href="https://x.com/Izc_it" target="_blank" class="contact-link">
+                    <i class="fa-brands fa-x-twitter"></i> https://x.com/Izc_it
+                </a>
+            </p>
+
+            <button class="close-btn-inner" onclick="closePrivacyModal()">รับทราบ</button>
+            <div style="clear:both;"></div>
+        </div>
+    </div>
+
+<script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxzBP1KTOwKYil3v-OOE6o3fwXchmP9MnU29Nx5uqyrRod9aI7YycaxTRN0eogfBLy64g/exec";
+    const CLIENT_ID = "1435981351290409109103".replace('9109103',''); // placeholder keep file static
+    const REDIRECT_URI = window.location.href.split('?')[0];
+
+    let sessionKey = localStorage.getItem("vote_session_key");
+    let userProfile = JSON.parse(localStorage.getItem("vote_user_profile") || "null");
+    let isVotingOpen = false;
+    let isSubmitting = false;
+    let allItems = [];
+    let allComments = [];
+    let currentImageIndex = 0;
+    let serverStatusGlobal = "WAITING";
+    let lastDataHash = null;
+
+    let currentScale = 1;
+    let isDragging = false;
+    let startX, startY, translateX = 0, translateY = 0;
+    const imgElement = document.getElementById("img01");
+
+    // utilities
+    function normalizeId(id) { return String(id).replace(/'/g, '').trim(); }
+    function showError(message) { const b = document.getElementById('errorBanner'); b.textContent = '⚠️ ' + message; b.style.display='block'; setTimeout(()=>b.style.display='none',5000); }
+    function showSuccess(message) { const t = document.createElement('div'); t.className='success-toast'; t.textContent='✅ '+message; document.body.appendChild(t); setTimeout(()=>t.remove(),3000);} 
+    function setLoading(btn, isLoading, originalText='ส่ง'){ if(!btn) return; if(isLoading){ btn.disabled=true; btn.dataset.originalText = btn.innerHTML; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i>'; } else { btn.disabled=false; btn.innerHTML = btn.dataset.originalText || originalText; }}
+
+    function zoomImage(step){ currentScale += step; if(currentScale<1) currentScale=1; if(currentScale>8) currentScale=8; updateTransform(); }
+    function resetZoom(){ currentScale=1; translateX=0; translateY=0; updateTransform(); }
+    function updateTransform(){ imgElement.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`; imgElement.style.cursor = currentScale>1 ? 'grab':'default'; }
+
+    imgElement.addEventListener('mousedown', e=>{ if(currentScale>1){ isDragging=true; startX = e.clientX - translateX; startY = e.clientY - translateY; imgElement.style.cursor='grabbing'; } });
+    window.addEventListener('mousemove', e=>{ if(isDragging){ e.preventDefault(); translateX = e.clientX - startX; translateY = e.clientY - startY; updateTransform(); } });
+    window.addEventListener('mouseup', ()=>{ isDragging=false; if(currentScale>1) imgElement.style.cursor='grab'; });
+    imgElement.addEventListener('touchstart', e=>{ if(currentScale>1 && e.touches.length===1){ isDragging=true; startX = e.touches[0].clientX - translateX; startY = e.touches[0].clientY - translateY; } });
+    window.addEventListener('touchmove', e=>{ if(isDragging && e.touches.length===1){ translateX = e.touches[0].clientX - startX; translateY = e.touches[0].clientY - startY; updateTransform(); } });
+    window.addEventListener('touchend', ()=>{ isDragging=false; });
+
+    function toggleFullScreen(){ const modal = document.getElementById('modal'); if(!document.fullscreenElement){ if(modal.requestFullscreen) modal.requestFullscreen(); else if(modal.webkitRequestFullscreen) modal.webkitRequestFullscreen(); } else { if(document.exitFullscreen) document.exitFullscreen(); } }
+    function toggleCommentSheet(){ document.getElementById('commentSheet').classList.toggle('active'); }
+
+    async function checkLogin(){ const urlParams = new URLSearchParams(window.location.search); const code = urlParams.get('code'); if(code){ try{ const res = await fetch(SCRIPT_URL,{ method:'POST', body: JSON.stringify({action:'login', code}) }); const j = await res.json(); if(j.status==='success'){ sessionKey = j.session_key; userProfile = j.user; localStorage.setItem('vote_session_key', sessionKey); localStorage.setItem('vote_user_profile', JSON.stringify(userProfile)); window.history.replaceState({}, document.title, window.location.pathname); showSuccess('เข้าสู่ระบบสำเร็จ'); } else { showError('Login ล้มเหลว'); } } catch(e){ showError('เข้าสู่ระบบไม่สำเร็จ'); } } renderUserBar(); }
+
+    function renderUserBar(){ const bar = document.getElementById('userBar'); if(userProfile){ const avatarUrl = userProfile.avatar ? `https://cdn.discordapp.com/avatars/${userProfile.id}/${userProfile.avatar}.png` : `https://cdn.discordapp.com/embed/avatars/0.png`; bar.innerHTML = `<div class="user-info"><img src="${avatarUrl}" class="user-avatar"><span class="user-name">${userProfile.username}</span><button onclick="logout()" style="margin-left:8px; border:none; background:none; cursor:pointer; color:#ff5555;"><i class="fa-solid fa-right-from-bracket"></i></button></div>`; } else { const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify`; bar.innerHTML = `<a href="${authUrl}" class="login-btn"><i class="fa-brands fa-discord"></i> Login</a>`; } }
+    function logout(){ if(confirm('ออกจากระบบ? ')){ localStorage.removeItem('vote_session_key'); localStorage.removeItem('vote_user_profile'); sessionKey=null; userProfile=null; renderUserBar(); location.reload(); } }
+
+    // Polling & update
+    const POLL_MS = 5000;
+    async function pollAndUpdate(){ try{ const res = await fetch(SCRIPT_URL); const data = await res.json(); const hash = JSON.stringify({entries:data.entries, votes:data.votes, comments:data.comments, votingStatus:data.votingStatus, endTime:data.endTime}); if(hash !== lastDataHash){ lastDataHash = hash; window._lastServerData = data; await updateFromData(data); } } catch(e){ console.warn('Poll failed', e); } }
+    }
+
+    async function loadData(){ await pollAndUpdate(); setInterval(pollAndUpdate, POLL_MS); }
+
+    // read metadata (size,type,dimensions) - try HEAD then fallback to image load
+    async function getImageMetadata(url){ const meta = { size: null, type: null, width: null, height: null, ext: null }; try{ const u = new URL(url); meta.ext = (u.pathname.split('.').pop()||'').toLowerCase(); // try HEAD
+            try{ const head = await fetch(url, { method:'HEAD' }); if(head && head.ok){ const cl = head.headers.get('content-length'); const ct = head.headers.get('content-type'); if(cl) meta.size = parseInt(cl,10); if(ct) meta.type = ct; } } catch(e){ /* ignore HEAD failure */ }
+            // get dimensions via Image
+            await new Promise((resolve, reject)=>{ const i = new Image(); i.onload = ()=>{ meta.width = i.naturalWidth; meta.height = i.naturalHeight; resolve(); }; i.onerror = ()=>resolve(); i.src = url; });
+        } catch(e){ console.warn('meta error', e); }
+        return meta;
+    }
+
+    // update DOM from server data
+    async function updateFromData(data){ try{
+            serverStatusGlobal = data.votingStatus || 'WAITING';
+            handleTimer(data.endTime, serverStatusGlobal);
+            allComments = data.comments || [];
+
+            // prepare items
+            allItems = (data.entries || []).map(it=>({ ...it, id: normalizeId(it.id), score: data.votes ? (data.votes[normalizeId(it.id)]||0) : 0 }));
+            // sort
+            if(serverStatusGlobal === 'CLOSED') allItems.sort((a,b)=> b.score - a.score); else allItems.sort((a,b)=> (a.id<b.id?-1:1));
+
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = '';
+
+            // determine if current user already voted
+            let userVotedFor = null;
+            if(userProfile && data.userVotes){ userVotedFor = data.userVotes[String(userProfile.id)]; }
+            if(!userVotedFor){ // fallback to localStorage
+                const local = localStorage.getItem('vote_voted_for'); if(local) userVotedFor = local;
+            }
+
+            if(allItems.length === 0){ gallery.innerHTML = "<p style='margin-top:50px;'>ไม่พบข้อมูล</p>"; return; }
+
+            // render cards
+            for(let index=0; index<allItems.length; index++){
+                const item = allItems[index];
+                const card = document.createElement('div'); card.className='card';
+                let rankBadge=''; let btnText='โหวต'; let btnClass=''; let btnDisabled=false;
+                if(serverStatusGlobal==='CLOSED'){ btnText='จบ'; btnDisabled=true; if(index===0){ card.classList.add('winner-1'); rankBadge = "<div class='rank-badge gold'><i class='fa-solid fa-crown'></i></div>"; } else if(index===1){ card.classList.add('winner-2'); rankBadge = "<div class='rank-badge silver'><i class='fa-solid fa-medal'></i></div>"; } else if(index===2){ card.classList.add('winner-3'); rankBadge = "<div class='rank-badge bronze'><i class='fa-solid fa-medal'></i></div>"; } else { rankBadge = `<div class='rank-badge' style='color:#555; border:2px solid #eee; font-size:1.2em; font-weight:bold;'>${index+1}</div>`; } }
+                else if(serverStatusGlobal === 'WAITING'){ btnText='รอเปิดโหวต'; btnClass='waiting'; btnDisabled=true; }
+
+                // if user already voted, disable others and mark the voted one
+                if(userVotedFor){ btnDisabled = true; if(String(item.id) === String(userVotedFor)){ btnText='โหวตแล้ว'; btnClass=''; } }
+
+                card.innerHTML = `
+                    ${rankBadge}
+                    <div class="votes-count"><i class="fa-solid fa-star"></i> ${item.score}</div>
+                    <div class="img-container"><img src="${item.url}" onclick="openModal(${index})" loading="lazy" alt="${item.author}"></div>
+                    <div class="info">
+                        <div class="author"><i class="fa-solid fa-user-pen"></i> ${item.author}</div>
+                        <div id="meta-${item.id}" style="font-size:0.85em; color:#777;">loading…</div>
+                        <button class="vote-btn ${btnClass}" id="btn-${item.id}" onclick="vote('${item.id}')" ${btnDisabled ? 'disabled' : ''}>${btnText}</button>
+                    </div>`;
+
+                gallery.appendChild(card);
+
+                // load metadata lazily (don't block rendering)
+                (async function(it){ const m = await getImageMetadata(it.url); const el = document.getElementById('meta-'+it.id); if(el){ const parts = []; if(m.ext) parts.push(m.ext.toUpperCase()); if(m.size) parts.push((m.size/1024).toFixed(1)+' KB'); if(m.width && m.height) parts.push(m.width+'×'+m.height+' px'); el.textContent = parts.join(' • '); } })(item);
+            }
+
+        } catch(e){ console.error(e); showError('อัปเดตข้อมูลล้มเหลว'); }
+    }
+
+    function handleTimer(endTimeStr, status){ const timerElem = document.getElementById('timer'); if(status==='WAITING'){ timerElem.innerHTML="<i class='fa-solid fa-hourglass'></i> รอ Admin เปิดโหวต..."; timerElem.style.color='#d4a017'; isVotingOpen=false; return;} if(status==='CLOSED'){ timerElem.innerHTML="<i class='fa-solid fa-flag-checkered'></i> การโหวตสิ้นสุดลงแล้ว"; timerElem.style.color='#d4a017'; isVotingOpen=false; return;} const endTime = new Date(endTimeStr).getTime(); if(isNaN(endTime)){ timerElem.innerHTML='ไม่พบเวลาปิดโหวต'; isVotingOpen=true; return; } let interval = window._vote_timer_interval; if(interval) clearInterval(interval); window._vote_timer_interval = setInterval(()=>{ const now = Date.now(); const distance = endTime - now; if(distance < 0){ clearInterval(window._vote_timer_interval); timerElem.innerHTML="<i class='fa-solid fa-clock'></i> หมดเวลา"; timerElem.style.color='#555'; isVotingOpen=false; setTimeout(()=>location.reload(),2000); } else { isVotingOpen=true; const h = Math.floor(distance/3600000); const m = Math.floor((distance%3600000)/60000); const s = Math.floor((distance%60000)/1000); timerElem.innerHTML = `<i class='fa-solid fa-hourglass-half'></i> ปิดโหวตใน: ${h}ชม. ${m}น. ${s}วิ.`; timerElem.style.color='#f72585'; } },1000); }
+
+    function vote(itemId){ if(!isVotingOpen){ showError('การโหวตยังไม่เปิด'); return; } if(!sessionKey){ showError('กรุณา Login'); return; } if(isSubmitting){ showError('กำลังประมวลผล'); return; }
+        // optimistic UI: disable buttons and show voted state
+        const btn = document.getElementById(`btn-${itemId}`); const modalBtn = document.getElementById('modal-vote-btn'); isSubmitting=true; if(btn) setLoading(btn,true); if(modalBtn) setLoading(modalBtn,true);
+        // mark locally to prevent duplicate clicks
+        localStorage.setItem('vote_voted_for', itemId);
+        if(btn){ btn.innerText='โหวตแล้ว'; btn.disabled=true; }
+        if(modalBtn){ modalBtn.innerText='โหวตแล้ว'; modalBtn.disabled=true; }
+
+        fetch(SCRIPT_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ action:'vote', session_key: sessionKey, voted_for_id: itemId }) })
+        .then(()=>{ showSuccess('โหวตแล้ว!'); setTimeout(()=>{ pollAndUpdate(); closeModal(); isSubmitting=false; if(btn) setLoading(btn,false); if(modalBtn) setLoading(modalBtn,false); },1200); })
+        .catch(err=>{ console.warn(err); showError('โหวตผิดพลาด'); isSubmitting=false; if(btn) setLoading(btn,false); if(modalBtn) setLoading(modalBtn,false); }); }
+
+    function openModal(index){ currentImageIndex=index; updateModalContent(); document.getElementById('modal').style.display='block'; document.body.classList.add('modal-open'); resetZoom(); }
+    function closeModal(){ document.getElementById('modal').style.display='none'; document.body.classList.remove('modal-open'); document.getElementById('commentSheet').classList.remove('active'); }
+
+    async function updateModalContent(){ if(allItems.length===0) return; const item = allItems[currentImageIndex]; const img = document.getElementById('img01'); img.src=''; // reset
+        // load full-size image, wait for natural size
+        img.src = item.url; img.style.maxWidth='95%'; img.style.maxHeight='95%'; img.onload = ()=>{ /* nothing extra needed - user can pan/zoom */ };
+        const authorSpan = document.querySelector('#modal-author span'); if(authorSpan) authorSpan.innerText = item.author;
+        const btn = document.getElementById('modal-vote-btn'); btn.onclick = ()=> vote(item.id);
+        btn.classList.remove('waiting'); if(serverStatusGlobal==='CLOSED'){ btn.innerText='จบ'; btn.disabled=true; } else if(serverStatusGlobal==='WAITING'){ btn.innerText='รอเปิดโหวต'; btn.disabled=true; btn.classList.add('waiting'); } else { // check if user already voted
+            const localV = localStorage.getItem('vote_voted_for'); const votedRemote = (window._lastServerData && window._lastServerData.userVotes && userProfile) ? window._lastServerData.userVotes[String(userProfile.id)] : null; const userVoted = votedRemote || localV; if(userVoted){ if(String(userVoted)===String(item.id)){ btn.innerText='โหวตแล้ว'; btn.disabled=true; } else { btn.innerText='โหวต'; btn.disabled=true; } } else { btn.innerText='โหวต'; btn.disabled=!isVotingOpen; } }
+        renderComments(item.id);
+        // populate modal meta
+        const meta = await getImageMetadata(item.url); const metaElem = document.querySelector('#modal .bottom-info'); if(metaElem){ const parts=[]; if(meta.ext) parts.push(meta.ext.toUpperCase()); if(meta.size) parts.push((meta.size/1024).toFixed(1)+' KB'); if(meta.width && meta.height) parts.push(meta.width+'×'+meta.height+' px'); const small = metaElem.querySelector('small'); if(small) small.textContent = parts.join(' • '); else metaElem.insertAdjacentHTML('beforeend', `<small style="display:block; color:#777; margin-top:6px;">${parts.join(' • ')}</small>`); }
+    }
+
+    function changeImage(n){ currentImageIndex += n; if(currentImageIndex >= allItems.length) currentImageIndex = 0; if(currentImageIndex < 0) currentImageIndex = allItems.length -1; resetZoom(); updateModalContent(); }
+
+    function renderComments(imageId){ const normalized = normalizeId(imageId); const comments = allComments.filter(c => normalizeId(c.imageId) === normalized); document.getElementById('comment-count-badge').innerText = comments.length; const list = document.getElementById('comments-list'); list.innerHTML=''; if(comments.length===0){ list.innerHTML = "<div style='text-align:center; color:#ccc; margin-top:20px;'>ยังไม่มีความคิดเห็น</div>"; } else { comments.forEach(c=>{ const uid = normalizeId(c.userId); const avatar = c.avatar ? `https://cdn.discordapp.com/avatars/${uid}/${c.avatar}.png` : 'https://cdn.discordapp.com/embed/avatars/0.png'; const time = new Date(c.timestamp).toLocaleString('th-TH',{ day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }); list.insertAdjacentHTML('beforeend', `<div class="comment-item"><img src="${avatar}" class="comment-avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"><div class="comment-bubble"><div class="comment-user">${c.username}</div><div class="comment-text">${c.text}</div><div class="comment-time">${time}</div></div></div>`); }); }
+        document.getElementById('comment-input-area').style.display = sessionKey ? 'flex' : 'none'; document.getElementById('login-warning').style.display = sessionKey ? 'none' : 'block'; }
+
+    function sendComment(){ if(!sessionKey) return; if(isSubmitting){ showError('กำลังประมวลผล'); return; } const input = document.getElementById('comment-input'); const text = input.value.trim(); const item = allItems[currentImageIndex]; if(!text){ showError('กรุณาพิมพ์ความคิดเห็น'); return; } if(!item){ showError('ไม่พบรูปภาพ'); return; } isSubmitting=true; const btn=document.getElementById('send-comment-btn'); setLoading(btn,true); input.disabled=true; const payload = JSON.stringify({ action:'add_comment', session_key: sessionKey, image_id: item.id, comment: text }); fetch(SCRIPT_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body: payload }).then(()=>{ input.value=''; showSuccess('ส่งความคิดเห็นแล้ว!'); setTimeout(()=>{ pollAndUpdate(); setLoading(btn,false); input.disabled=false; isSubmitting=false; input.focus(); },800); }).catch(e=>{ showError('ส่งไม่สำเร็จ'); setLoading(btn,false); input.disabled=false; isSubmitting=false; }); }
+
+    function openPrivacyModal(){ document.getElementById('privacyModal').style.display='block'; }
+    function closePrivacyModal(){ document.getElementById('privacyModal').style.display='none'; }
+    window.onclick = function(e){ if(e.target == document.getElementById('modal')) closeModal(); if(e.target == document.getElementById('privacyModal')) closePrivacyModal(); }
+
+    // keep last server data for modal vote checks
+    window._lastServerData = null;
+
+    // Kickoff
+    checkLogin(); loadData();
+
+</script>
+
+</body>
+</html>
