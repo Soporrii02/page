@@ -378,6 +378,8 @@
     let startX, startY, translateX = 0, translateY = 0;
     const imgElement = document.getElementById("img01");
 
+    // (Client-side blacklist removed) All entries from the server are now shown.
+
     // utilities
     function normalizeId(id) { return String(id).replace(/'/g, '').trim(); }
     function showError(message) { const b = document.getElementById('errorBanner'); b.textContent = '⚠️ ' + message; b.style.display='block'; setTimeout(()=>b.style.display='none',5000); }
@@ -514,7 +516,7 @@
             allComments = data.comments || [];
 
             // prepare items (dedupe by id in case server returned duplicates)
-            const rawEntries = data.entries || [];
+            const rawEntries = (data.entries || []);
             const seen = {};
             allItems = [];
             for (const it of rawEntries){
@@ -566,18 +568,9 @@
                     const m = await getImageMetadata(it.url);
                     const el = document.getElementById('meta-'+it.id);
                     if(!el) return;
-                    const parts = [];
-                    // prefer explicit extension, but avoid exposing raw path-like values
-                    if(m.ext && !m.ext.startsWith('/')) parts.push(m.ext.toUpperCase());
-                    if(m.size) parts.push((m.size/1024).toFixed(1)+' KB');
-                    if(m.width && m.height) parts.push(m.width+'×'+m.height+' px');
-                    if(m.dpiX) parts.push((m.dpiX) + ' DPI');
-                    if(m.colorSpaceLabel) parts.push(m.colorSpaceLabel);
-                    // fallback: if nothing useful, show short url/id
-                    if(parts.length === 0){
-                        try{ const u = new URL(it.url); parts.push(u.pathname.split('/').slice(-1)[0] || u.hostname); } catch(e){ parts.push('file'); }
-                    }
-                    el.textContent = parts.join(' • ');
+                    // Show only file size (KB) in the gallery
+                    if(m.size){ el.textContent = (m.size/1024).toFixed(1) + ' KB'; }
+                    else { el.textContent = ''; }
                 })(item);
             }
 
@@ -647,20 +640,11 @@
         const meta = await getImageMetadata(item.url);
         const metaElem = document.querySelector('#modal .bottom-info');
         if(metaElem){
-            const parts=[];
-            if(meta.ext) parts.push(meta.ext.toUpperCase());
-            if(meta.size) parts.push((meta.size/1024).toFixed(1)+' KB');
-            if(meta.width && meta.height) parts.push(meta.width+'×'+meta.height+' px');
-            if(meta.dpiX) parts.push(meta.dpiX + ' DPI');
-            if(meta.colorSpaceLabel) parts.push(meta.colorSpaceLabel);
+            // Modal shows only file size (KB)
             const small = metaElem.querySelector('small');
-            const pathLine = `<div style="color:#aaa; font-size:0.82em; margin-top:6px;">${item.url}</div>`; // full URL/path only shown in modal
-            if(small) small.textContent = parts.join(' • ');
-            else metaElem.insertAdjacentHTML('beforeend', `<small style="display:block; color:#777; margin-top:6px;">${parts.join(' • ')}</small>`);
-            // append full url/path below metadata
-            // remove previous path if present
-            const existingPath = metaElem.querySelector('.modal-path'); if(existingPath) existingPath.remove();
-            metaElem.insertAdjacentHTML('beforeend', `<div class="modal-path" style="color:#999; font-size:0.78em; margin-top:6px; word-break:break-all;">${item.url}</div>`);
+            const sizeText = meta.size ? (meta.size/1024).toFixed(1) + ' KB' : '';
+            if(small) small.textContent = sizeText;
+            else if(sizeText) metaElem.insertAdjacentHTML('beforeend', `<small style="display:block; color:#777; margin-top:6px;">${sizeText}</small>`);
         }
     }
 
