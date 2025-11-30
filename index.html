@@ -622,17 +622,23 @@
                 if(votedRemote){
                     // Vote confirmed by server
                     localStorage.setItem('vote_voted_for', votedRemote);
-                    // Ensure both card and modal show voted state
-                    const confirmedBtn = document.getElementById(`btn-${votedRemote}`);
-                    if(confirmedBtn){ confirmedBtn.innerText = 'โหวตแล้ว'; confirmedBtn.disabled = true; }
-                    if(cardBtn && String(cardBtn.id) !== `btn-${votedRemote}`){ /* disable original card if different */ }
-                    if(modalBtn){ modalBtn.innerText = 'โหวตแล้ว'; modalBtn.disabled = true; }
+                    // Stop loading state first, then enforce final disabled state so setLoading
+                    // doesn't re-enable the button.
                     if(cardBtn) setLoading(cardBtn, false);
                     if(modalBtn) setLoading(modalBtn, false);
+
+                    const confirmedBtn = document.getElementById(`btn-${votedRemote}`);
+                    if(confirmedBtn){ confirmedBtn.innerText = 'โหวตแล้ว'; confirmedBtn.disabled = true; }
+                    // If the original cardBtn refers to a different element, ensure it's disabled
+                    if(cardBtn && String(cardBtn.id) !== `btn-${votedRemote}`){ cardBtn.disabled = true; }
+                    if(modalBtn){ modalBtn.innerText = 'โหวตแล้ว'; modalBtn.disabled = true; }
+
                     isSubmitting = false;
                     window._pendingVote = null;
                     // re-render comments for this item if needed
                     try{ renderComments(votedRemote); }catch(e){}
+                    // refresh modal content to ensure full sync (author, buttons, meta)
+                    try{ updateModalContent(); }catch(e){}
                     if(!keepOpen) closeModal();
                     showSuccess('โหวตแล้ว!');
                     return;
@@ -643,10 +649,13 @@
                     localStorage.setItem('vote_voted_for', last.userVotes[String(userProfile.id)]);
                     // update UI according to server state by forcing a full refresh
                     await pollAndUpdate();
-                    isSubmitting = false;
-                    window._pendingVote = null;
+                    // stop loading then reflect server state in modal/card
                     if(cardBtn) setLoading(cardBtn, false);
                     if(modalBtn) setLoading(modalBtn, false);
+                    // ensure modal reflects server state
+                    try{ updateModalContent(); }catch(e){}
+                    isSubmitting = false;
+                    window._pendingVote = null;
                     showError('คุณได้โหวตไปแล้วก่อนหน้านี้');
                     return;
                 }
