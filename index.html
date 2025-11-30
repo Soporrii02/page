@@ -395,7 +395,15 @@
 
     // Polling & update
     const POLL_MS = 5000;
-    async function pollAndUpdate(){ try{ const res = await fetch(SCRIPT_URL); const data = await res.json(); const hash = JSON.stringify({entries:data.entries, votes:data.votes, comments:data.comments, votingStatus:data.votingStatus, endTime:data.endTime}); if(hash !== lastDataHash){ lastDataHash = hash; window._lastServerData = data; await updateFromData(data); } } catch(e){ console.warn('Poll failed', e); } }
+    async function pollAndUpdate(){
+        try{
+            const res = await fetch(SCRIPT_URL);
+            const data = await res.json();
+            const hash = JSON.stringify({entries:data.entries, votes:data.votes, comments:data.comments, votingStatus:data.votingStatus, endTime:data.endTime});
+            if(hash !== lastDataHash){ lastDataHash = hash; window._lastServerData = data; await updateFromData(data); }
+        } catch(e){
+            console.warn('Poll failed', e);
+        }
     }
 
     async function loadData(){ await pollAndUpdate(); setInterval(pollAndUpdate, POLL_MS); }
