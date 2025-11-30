@@ -532,10 +532,26 @@
             gallery.innerHTML = '';
 
             // determine if current user already voted
+            // Prefer authoritative server data. Only fall back to localStorage when
+            // the server did not provide a `userVotes` map (e.g. offline or older
+            // server response). If the server DID provide `userVotes` but there is
+            // no entry for this user, that means the vote sheet has no record —
+            // clear any stale local cache so the UI reflects server state.
             let userVotedFor = null;
-            if(userProfile && data.userVotes){ userVotedFor = data.userVotes[String(userProfile.id)]; }
-            if(!userVotedFor){ // fallback to localStorage
-                const local = localStorage.getItem('vote_voted_for'); if(local) userVotedFor = local;
+            if (userProfile) {
+                if (data.userVotes && Object.prototype.hasOwnProperty.call(data.userVotes, String(userProfile.id))) {
+                    userVotedFor = data.userVotes[String(userProfile.id)];
+                } else if (!data.userVotes) {
+                    // Server didn't provide userVotes at all — possibly an older
+                    // response; fall back to local cache.
+                    const local = localStorage.getItem('vote_voted_for'); if (local) userVotedFor = local;
+                } else {
+                    // Server provided userVotes but no entry for this user —
+                    // that means the sheet has no vote for them. Remove stale
+                    // cached vote to avoid showing incorrect disabled buttons.
+                    localStorage.removeItem('vote_voted_for');
+                    userVotedFor = null;
+                }
             }
 
             if(allItems.length === 0){ gallery.innerHTML = "<p style='margin-top:50px;'>ไม่พบข้อมูล</p>"; return; }
@@ -703,7 +719,23 @@
         const authorSpan = document.querySelector('#modal-author span'); if(authorSpan) authorSpan.innerText = item.author;
         const btn = document.getElementById('modal-vote-btn'); btn.onclick = ()=> vote(item.id, true);
         btn.classList.remove('waiting'); if(serverStatusGlobal==='CLOSED'){ btn.innerText='จบ'; btn.disabled=true; } else if(serverStatusGlobal==='WAITING'){ btn.innerText='รอเปิดโหวต'; btn.disabled=true; btn.classList.add('waiting'); } else { // check if user already voted
-            const localV = localStorage.getItem('vote_voted_for'); const votedRemote = (window._lastServerData && window._lastServerData.userVotes && userProfile) ? window._lastServerData.userVotes[String(userProfile.id)] : null; const userVoted = votedRemote || localV; if(userVoted){ if(String(userVoted)===String(item.id)){ btn.innerText='โหวตแล้ว'; btn.disabled=true; } else { btn.innerText='โหวต'; btn.disabled=true; } } else { btn.innerText='โหวต'; btn.disabled=!isVotingOpen; } }
+            const localV = localStorage.getItem('vote_voted_for');
+            const votedRemote = (window._lastServerData && window._lastServerData.userVotes && userProfile && Object.prototype.hasOwnProperty.call(window._lastServerData.userVotes, String(userProfile.id))) ? window._lastServerData.userVotes[String(userProfile.id)] : null;
+            // If server provided `userVotes` but no entry for the user, ensure
+            // we don't treat a stale local cache as authoritative.
+            let userVoted = null;
+            if (votedRemote !== null && votedRemote !== undefined) {
+                userVoted = votedRemote;
+            } else if (!window._lastServerData || !window._lastServerData.userVotes) {
+                userVoted = localV;
+            } else {
+                // server provided userVotes and it doesn't include this user
+                // -> clear stale local cache
+                localStorage.removeItem('vote_voted_for');
+                userVoted = null;
+            }
+
+            if(userVoted){ if(String(userVoted)===String(item.id)){ btn.innerText='โหวตแล้ว'; btn.disabled=true; } else { btn.innerText='โหวต'; btn.disabled=true; } } else { btn.innerText='โหวต'; btn.disabled=!isVotingOpen; } }
         renderComments(item.id);
         // populate modal meta (show more details including the server path/ID)
         const meta = await getImageMetadata(item.url);
