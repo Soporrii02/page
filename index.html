@@ -568,9 +568,11 @@
                     const m = await getImageMetadata(it.url);
                     const el = document.getElementById('meta-'+it.id);
                     if(!el) return;
-                    // Show only file size (KB) in the gallery
-                    if(m.size){ el.textContent = (m.size/1024).toFixed(1) + ' KB'; }
-                    else { el.textContent = ''; }
+                    // Show file size (KB) and resolution (WxH) if available
+                    const parts = [];
+                    if(m.size) parts.push((m.size/1024).toFixed(1) + ' KB');
+                    if(m.width && m.height) parts.push(m.width + '×' + m.height);
+                    el.textContent = parts.join(' · ');
                 })(item);
             }
 
@@ -581,44 +583,102 @@
 
     // vote(itemId, keepOpen=false)
     // When keepOpen is true (modal vote), do not auto-close modal so user can comment.
+    // This implements optimistic UI + verification: the UI is disabled immediately,
+    // the POST is sent (no-cors), then the client polls the server a few times to
+    // confirm the vote. On success we persist to localStorage; on repeated failure
+    // we roll back the optimistic UI so it doesn't get stuck.
     function vote(itemId, keepOpen=false){
         if(!isVotingOpen){ showError('การโหวตยังไม่เปิด'); return; }
         if(!sessionKey){ showError('กรุณา Login'); return; }
         if(isSubmitting){ showError('กำลังประมวลผล'); return; }
 
-        // optimistic UI: disable buttons and show voted state
-        const btn = document.getElementById(`btn-${itemId}`);
+        const cardBtn = document.getElementById(`btn-${itemId}`);
         const modalBtn = document.getElementById('modal-vote-btn');
-        isSubmitting=true;
-        if(btn) setLoading(btn,true);
-        if(modalBtn) setLoading(modalBtn,true);
+        isSubmitting = true;
 
-        // mark locally to prevent duplicate clicks
-        localStorage.setItem('vote_voted_for', itemId);
-        if(btn){ btn.innerText='โหวตแล้ว'; btn.disabled=true; }
-        if(modalBtn){ modalBtn.innerText='โหวตแล้ว'; modalBtn.disabled=true; }
+        // Optimistic disable + spinner
+        if(cardBtn) setLoading(cardBtn, true);
+        if(modalBtn) setLoading(modalBtn, true);
 
+        // Mark a pending vote in memory so other code can know
+        window._pendingVote = { itemId: itemId, timestamp: Date.now() };
+
+        // Send POST (no-cors) - we cannot read response reliably from fetch when mode:no-cors
         fetch(SCRIPT_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ action:'vote', session_key: sessionKey, voted_for_id: itemId }) })
-        .then(()=>{
-            showSuccess('โหวตแล้ว!');
-            // refresh data and comments; if keepOpen is false, close modal, otherwise keep it open so user can comment
-            setTimeout(async ()=>{
-                await pollAndUpdate();
-                // re-render comments for this item if modal is open
-                try{ renderComments(itemId); }catch(e){}
-                isSubmitting=false;
-                if(btn) setLoading(btn,false);
-                if(modalBtn) setLoading(modalBtn,false);
-                if(!keepOpen) closeModal();
-            },1200);
-        })
-        .catch(err=>{
-            console.warn(err);
-            showError('โหวตผิดพลาด');
-            isSubmitting=false;
-            if(btn) setLoading(btn,false);
-            if(modalBtn) setLoading(modalBtn,false);
-        });
+        .catch(err => { console.warn('vote POST error', err); });
+
+        // Verification loop: poll server several times to confirm the vote was recorded
+        let attempts = 0;
+        const maxAttempts = 6;
+        const attemptInterval = 1200;
+
+        const verify = async () => {
+            attempts += 1;
+            try{
+                await pollAndUpdate(); // updates window._lastServerData
+                const last = window._lastServerData || {};
+                const votedRemote = (last.userVotes && userProfile) ? last.userVotes[String(userProfile.id)] : null;
+
+                if(votedRemote){
+                    // Vote confirmed by server
+                    localStorage.setItem('vote_voted_for', votedRemote);
+                    // Ensure both card and modal show voted state
+                    const confirmedBtn = document.getElementById(`btn-${votedRemote}`);
+                    if(confirmedBtn){ confirmedBtn.innerText = 'โหวตแล้ว'; confirmedBtn.disabled = true; }
+                    if(cardBtn && String(cardBtn.id) !== `btn-${votedRemote}`){ /* disable original card if different */ }
+                    if(modalBtn){ modalBtn.innerText = 'โหวตแล้ว'; modalBtn.disabled = true; }
+                    if(cardBtn) setLoading(cardBtn, false);
+                    if(modalBtn) setLoading(modalBtn, false);
+                    isSubmitting = false;
+                    window._pendingVote = null;
+                    // re-render comments for this item if needed
+                    try{ renderComments(votedRemote); }catch(e){}
+                    if(!keepOpen) closeModal();
+                    showSuccess('โหวตแล้ว!');
+                    return;
+                }
+
+                // If server says duplicate (user already voted another), reflect that too
+                if(last && last.userVotes && userProfile && last.userVotes[String(userProfile.id)] !== undefined && last.userVotes[String(userProfile.id)] !== itemId){
+                    localStorage.setItem('vote_voted_for', last.userVotes[String(userProfile.id)]);
+                    // update UI according to server state by forcing a full refresh
+                    await pollAndUpdate();
+                    isSubmitting = false;
+                    window._pendingVote = null;
+                    if(cardBtn) setLoading(cardBtn, false);
+                    if(modalBtn) setLoading(modalBtn, false);
+                    showError('คุณได้โหวตไปแล้วก่อนหน้านี้');
+                    return;
+                }
+
+                if(attempts < maxAttempts){
+                    setTimeout(verify, attemptInterval);
+                    return;
+                }
+
+                // Exhausted attempts: rollback optimistic UI
+                showError('โหวตไม่สำเร็จ (โปรดลองใหม่)');
+                if(cardBtn){ setLoading(cardBtn, false); cardBtn.disabled = false; if(cardBtn.dataset.originalText) cardBtn.innerText = cardBtn.dataset.originalText; else cardBtn.innerText = 'โหวต'; }
+                if(modalBtn){ setLoading(modalBtn, false); modalBtn.disabled = false; modalBtn.innerText = 'โหวต'; }
+                localStorage.removeItem('vote_voted_for');
+                isSubmitting = false;
+                window._pendingVote = null;
+            }catch(err){
+                console.warn('verify error', err);
+                if(attempts < maxAttempts) setTimeout(verify, attemptInterval);
+                else {
+                    showError('โหวตไม่สำเร็จ (โปรดลองใหม่)');
+                    if(cardBtn) setLoading(cardBtn, false);
+                    if(modalBtn) setLoading(modalBtn, false);
+                    localStorage.removeItem('vote_voted_for');
+                    isSubmitting = false;
+                    window._pendingVote = null;
+                }
+            }
+        };
+
+        // start verification shortly after sending
+        setTimeout(verify, 800);
     }
 
     function openModal(index){
@@ -640,9 +700,12 @@
         const meta = await getImageMetadata(item.url);
         const metaElem = document.querySelector('#modal .bottom-info');
         if(metaElem){
-            // Modal shows only file size (KB)
+            // Modal shows file size and resolution when available
             const small = metaElem.querySelector('small');
-            const sizeText = meta.size ? (meta.size/1024).toFixed(1) + ' KB' : '';
+            const parts = [];
+            if(meta.size) parts.push((meta.size/1024).toFixed(1) + ' KB');
+            if(meta.width && meta.height) parts.push(meta.width + '×' + meta.height);
+            const sizeText = parts.join(' · ');
             if(small) small.textContent = sizeText;
             else if(sizeText) metaElem.insertAdjacentHTML('beforeend', `<small style="display:block; color:#777; margin-top:6px;">${sizeText}</small>`);
         }
